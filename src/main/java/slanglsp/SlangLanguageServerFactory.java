@@ -28,8 +28,9 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
 {
     String getSlangTextMateBundlePath()
     {
-        return slanglsp.SlangUtils.getPluginDir()+"slang-vscode-extension";
+        return slanglsp.SlangUtils.getPluginDir() + "slang-vscode-extension";
     }
+
     static boolean IS_FIRST_INIT = true;
 
     void loadTextMate(Project project)
@@ -43,8 +44,7 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
         try
         {
             TextMateUserBundlesSettings.getInstance().addBundle(getSlangTextMateBundlePath(), "slang-vscode-extension");
-        }
-        catch(Exception e)
+        } catch (Exception e)
         {
             NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
                 "Slang LSP",
@@ -63,8 +63,7 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
         {
             SlangVersion cachedVersion = SlangUtils.getVersion();
             SlangVersion.writeSlangVersionFile(versionCacheFile, cachedVersion.getMajor(), cachedVersion.getMinor(), cachedVersion.getPatch());
-        }
-        catch(Exception e)
+        } catch (Exception e)
         {
             NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
                 "Slang LSP",
@@ -79,17 +78,16 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
         // If cache is missing, return true
         File versionCacheFile = SlangUtils.getVersionCacheFile();
 
-        if(!versionCacheFile.exists())
+        if (!versionCacheFile.exists())
             return true;
 
         // If cache version != current version, return true
         try
         {
             SlangVersion cachedVersion = new SlangVersion(versionCacheFile.toURI().toURL().openStream());
-            if(!cachedVersion.equals(SlangUtils.getVersion()))
+            if (!cachedVersion.equals(SlangUtils.getVersion()))
                 return true;
-        }
-        catch(Exception e)
+        } catch (Exception e)
         {
             updateExtensionVersionCache(project);
             return true;
@@ -98,12 +96,24 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
         return false;
     }
 
-    // This function assumes if a file is lacking an extension, it is a directory
-    void extractZip(InputStream zipToUnpack, String dstDir, Project project)
+    void failedToMakeFolder(Project project)
     {
-        File dir = new File(dstDir);
+        NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
+            "Slang LSP",
+            "Failed to create folder",
+            NotificationType.ERROR
+        ).notify(project);
+    }
+    // This function assumes if a file is lacking an extension, it is a directory
+    void extractZip(InputStream zipToUnpack, Path dstDir, Project project)
+    {
+        File dir = dstDir.toFile();
         // create output directory if it doesn't exist
-        if(!dir.exists()) dir.mkdirs();
+        if(!dir.exists())
+        {
+            if(!dir.mkdirs())
+                failedToMakeFolder(project);
+        }
         //buffer for read and write data to file
         byte[] buffer = new byte[1024];
         try
@@ -112,12 +122,18 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
             ZipEntry ze = zis.getNextEntry();
             while(ze != null)
             {
-                String fileName = ze.getName();
-                File newFile = new File(dstDir + File.separator + fileName);
-
+                String fileName = ze.getName().replace("\\", "/");
+                Path newFilePath = dstDir.resolve(fileName);
+                File newFile = newFilePath.toFile();
+                NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
+                    "Slang LSP",
+                    "to make file: "+newFile.getAbsolutePath()+". Given Path: "+newFilePath,
+                    NotificationType.ERROR
+                ).notify(project);
                 if(!fileName.contains("."))
                 {
-                    newFile.mkdirs();
+                    if(!newFile.mkdirs())
+                        failedToMakeFolder(project);
                 }
                 else
                 {
@@ -224,7 +240,7 @@ class SlangLanguageServer extends ProcessStreamConnectionProvider
         {
             NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
                 "Slang LSP",
-                "`slangd`/`slangd.exe` was not found in the `PATH` environment variable. It is preferable to add (once the latest vulkan SDK is installed) `$VK_SDK_PATH/bin` to your `PATH` environment variable, then restart this IDE.",
+                "`slangd`/`slangd.exe` was not found in the `PATH` environment variable. It is preferable to add (once the latest vulkan SDK is installed) `$VK_SDK_PATH/bin` to your `PATH` environment variable (on linux the paths *may* differ slightly) to use `slangd` bundled with the Vulkan SDK. After these steps, restart this IDE.",
                 NotificationType.ERROR
             ).notify(project);
             LanguageServerManager.getInstance(project).stop("slangLanguageServer");

@@ -1,8 +1,11 @@
 package slanglsp;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import com.intellij.notification.NotificationGroupManager;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.psi.tree.IElementType;
 
@@ -17,20 +20,21 @@ public class SlangUtils
     static IElementType L_PARENTHESIS = new IElementType("(", SlangLanguage.INSTANCE);
     static IElementType R_PARENTHESIS = new IElementType(")", SlangLanguage.INSTANCE);
 
-    static String getPluginDir()
+    static Path getPluginDir()
     {
         String jarPath = PathManager.getJarPathForClass(SlangUtils.class);
         if(jarPath == null)
             throw new RuntimeException("Invalid 'getJarPathForClass'");
-        return Paths.get(jarPath).getParent().toString()+"/";
+        return Paths.get(jarPath).getParent().toAbsolutePath();
     }
-    static String getVersionCacheLocation()
+    static Path getVersionCacheLocation()
     {
-        return Paths.get(slanglsp.SlangUtils.getPluginDir())+"\\versionCache.txt";
+        return slanglsp.SlangUtils.getPluginDir().resolve("versionCache.txt");
     }
     static File getVersionCacheFile()
     {
-        return Paths.get(getVersionCacheLocation()).toFile();
+        File newFile = getVersionCacheLocation().toFile();
+        return newFile;
     }
 
     static SlangVersion getVersion()
