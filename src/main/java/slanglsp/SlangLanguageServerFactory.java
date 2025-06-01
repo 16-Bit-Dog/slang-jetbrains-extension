@@ -125,11 +125,6 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
                 String fileName = ze.getName().replace("\\", "/");
                 Path newFilePath = dstDir.resolve(fileName);
                 File newFile = newFilePath.toFile();
-                NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                    "Slang LSP",
-                    "to make file: "+newFile.getAbsolutePath()+". Given Path: "+newFilePath,
-                    NotificationType.ERROR
-                ).notify(project);
                 if(!fileName.contains("."))
                 {
                     if(!newFile.mkdirs())
