@@ -20,6 +20,10 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="Slang" language="Slang" implementationClass="slanglsp.SlangFileType" extensions="slang" fieldName="INSTANCE"/>
+        
+        <editorHighlighterProvider filetype="Slang" implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
+        <lang.syntaxHighlighterFactory language="Slang"
+                                   implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
 
         <codeInsight.parameterInfo
                 language="Slang"
