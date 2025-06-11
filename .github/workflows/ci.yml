@@ -1,0 +1,169 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # BUILD & TEST JOB
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build plugin
+      run: ./gradlew buildPlugin
+
+    - name: Run tests
+      run: ./gradlew test
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: plugin-artifact
+        path: build/distributions/*.zip
+        retention-days: 30
+
+    - name: Comment PR with build status
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = 'build/distributions';
+
+          let comment = '## 🔧 Build Results\n\n';
+
+          if (fs.existsSync(path)) {
+            const files = fs.readdirSync(path);
+            const zipFiles = files.filter(f => f.endsWith('.zip'));
+
+            if (zipFiles.length > 0) {
+              comment += '✅ Plugin built successfully!\n\n';
+              comment += '**Artifacts:**\n';
+              zipFiles.forEach(file => {
+                comment += `- ${file}\n`;
+              });
+            } else {
+              comment += '❌ No plugin artifacts found.\n';
+            }
+          } else {
+            comment += '❌ Build failed - no distribution directory found.\n';
+          }
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  # PUBLISH JOB - Only runs on pushes to main (i.e., merged PRs)
+  publish:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Update version number (patch increment)
+      run: |
+        # Load current version
+        source version.properties
+
+        # Increment patch version
+        NEW_PATCH=$((patch + 1))
+        NEW_VERSION="$major.$minor.$NEW_PATCH"
+
+        # Update version.properties file
+        cat > version.properties << EOF
+        # Version of the project
+        major=$major
+        minor=$minor
+        patch=$NEW_PATCH
+        # Optional suffix like -alpha, -beta, etc.
+        suffix=$suffix
+        EOF
+
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+    - name: Build and sign plugin
+      env:
+        SLANG_LSP_CERTIFICATE_CHAIN: ${{ secrets.SLANG_LSP_CERTIFICATE_CHAIN }}
+        SLANG_LSP_PRIVATE_KEY: ${{ secrets.SLANG_LSP_PRIVATE_KEY }}
+        SLANG_LSP_PRIVATE_KEY_PASSWORD: ${{ secrets.SLANG_LSP_PRIVATE_KEY_PASSWORD }}
+      run: ./gradlew buildPlugin signPlugin
+
+    - name: Publish to JetBrains Marketplace
+      env:
+        SLANG_LSP_PUBLISH_TOKEN: ${{ secrets.SLANG_LSP_PUBLISH_TOKEN }}
+      run: ./gradlew publishPlugin
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ env.NEW_VERSION }}
+        name: Release v${{ env.NEW_VERSION }}
+        body: |
+          Release v${{ env.NEW_VERSION }}
+
+          Automated release from merge to main branch.
+        files: build/distributions/*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Commit version bump
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@github.com'
+        git add version.properties
+        git commit -m "Bump version to ${{ env.NEW_VERSION }} [skip ci]"
+        git push

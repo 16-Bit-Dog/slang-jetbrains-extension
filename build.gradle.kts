@@ -3,8 +3,31 @@ import java.io.*
 import java.nio.file.Paths
 import java.util.zip.*
 import kotlin.io.path.absolute
+import java.util.Properties
 
-fun getProjectVersion():String = "0.0.6"
+fun loadVersionProperties(): Properties {
+    val properties = Properties()
+    file("version.properties").inputStream().use { properties.load(it) }
+    return properties
+}
+
+fun getProjectVersion(): String {
+    // If version is provided through command line or CI, use that
+    val explicitVersion = project.findProperty("version")?.toString()
+    if (!explicitVersion.isNullOrBlank()) {
+        return explicitVersion
+    }
+
+    // Otherwise read from version.properties
+    val props = loadVersionProperties()
+    val major = props.getProperty("major")
+    val minor = props.getProperty("minor")
+    val patch = props.getProperty("patch")
+    val suffix = props.getProperty("suffix", "")
+
+    return "$major.$minor.$patch$suffix"
+}
+
 project.version = getProjectVersion()
 group = "slang"
 
@@ -96,10 +119,14 @@ tasks {
         kotlinOptions.jvmTarget = "17"
     }
 
-    buildPlugin
+    buildPlugin {
+        archiveBaseName.set("slang-intellij")
+        archiveVersion.set(getProjectVersion())
+    }
 
     runIde
-    /*
+
+    // Enable signing and publishing for CI
     signPlugin {
         certificateChain.set(System.getenv("SLANG_LSP_CERTIFICATE_CHAIN"))
         privateKey.set(System.getenv("SLANG_LSP_PRIVATE_KEY"))
@@ -109,7 +136,6 @@ tasks {
     publishPlugin {
         token.set(System.getenv("SLANG_LSP_PUBLISH_TOKEN"))
     }
-    */
 }
 
 intellijPlatform {
