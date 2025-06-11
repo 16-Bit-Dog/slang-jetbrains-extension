@@ -26,24 +26,18 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 public class SlangLanguageServerFactory implements LanguageServerFactory
 {
-    String getSlangTextMateBundlePath()
+    Path getSlangTextMateBundlePath()
     {
-        return slanglsp.SlangUtils.getPluginDir() + "slang-vscode-extension";
+        return slanglsp.SlangUtils.getPluginDir().resolve("slang-vscode-extension");
     }
 
     static boolean IS_FIRST_INIT = true;
 
     void loadTextMate(Project project)
     {
-        File path = Paths.get(getSlangTextMateBundlePath()).toFile();
-//        NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-//            "Slang LSP",
-//            "Can Read The Slang TextMate Info Folder ==> "+path.canRead(),
-//            NotificationType.ERROR
-//        ).notify(project);
         try
         {
-            TextMateUserBundlesSettings.getInstance().addBundle(getSlangTextMateBundlePath(), "slang-vscode-extension");
+            TextMateUserBundlesSettings.getInstance().addBundle(getSlangTextMateBundlePath().toAbsolutePath().toString(), "slang-vscode-extension");
         } catch (Exception e)
         {
             NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
