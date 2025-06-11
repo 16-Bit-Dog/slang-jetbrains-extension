@@ -7,8 +7,8 @@
 
     <description>
         <![CDATA[
-        <p>Slang [Unofficial] is a plugin that provides Slang language support for IntelliJ platforms. This plugin is not an official Slang plugin.</p>
-        <p>To use this plugin it is preferable to add `$VK_SDK_PATH/bin` to your `PATH` environment variable </p>
+        <p>Slang [Unofficial] is a plugin that provides Slang language support for Jetbrain's platforms. This plugin is not an official Slang plugin.</p>
+        <p>To use this plugin, please add `slangd` to the PATH. This can be done through adding `$VK_SDK_PATH/bin` to your `PATH` environment variable </p>
         ]]>
     </description>
 
@@ -20,7 +20,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="Slang" language="Slang" implementationClass="slanglsp.SlangFileType" extensions="slang" fieldName="INSTANCE"/>
-        
+
         <editorHighlighterProvider filetype="Slang" implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
         <lang.syntaxHighlighterFactory language="Slang"
                                    implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
