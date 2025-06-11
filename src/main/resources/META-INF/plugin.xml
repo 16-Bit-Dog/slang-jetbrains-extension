@@ -19,7 +19,7 @@
     <depends>com.redhat.devtools.lsp4ij</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <fileType name="Slang" implementationClass="slanglsp.SlangFileType" extensions="slang"/>
+        <fileType name="Slang" language="Slang" implementationClass="slanglsp.SlangFileType" extensions="slang" fieldName="INSTANCE"/>
 
         <codeInsight.parameterInfo
                 language="Slang"
