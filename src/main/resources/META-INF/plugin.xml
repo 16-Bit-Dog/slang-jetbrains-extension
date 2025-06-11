@@ -19,6 +19,8 @@
     <depends>com.redhat.devtools.lsp4ij</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <fileType name="Slang" implementationClass="slanglsp.SlangFileType" extensions="slang"/>
+
         <codeInsight.parameterInfo
                 language="Slang"
                 implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
