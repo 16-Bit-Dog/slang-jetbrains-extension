@@ -4,7 +4,7 @@ import java.nio.file.Paths
 import java.util.zip.*
 import kotlin.io.path.absolute
 
-fun getProjectVersion():String = "0.0.6"
+fun getProjectVersion():String = "0.0.7"
 project.version = getProjectVersion()
 group = "slang"
 
@@ -33,7 +33,7 @@ dependencies {
 
         jetbrainsRuntime()
         bundledPlugin("org.jetbrains.plugins.textmate")
-        plugin("com.redhat.devtools.lsp4ij:0.9.0")
+        plugin("com.redhat.devtools.lsp4ij:0.13.0")
     }
     implementation("com.google.code.gson:gson:2.11.0")
 }
@@ -115,7 +115,7 @@ tasks {
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "232.0"
+            sinceBuild = "233.0"
             untilBuild = provider { null }
         }
     }
