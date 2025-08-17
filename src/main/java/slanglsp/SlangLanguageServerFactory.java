@@ -11,7 +11,6 @@ import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
-import net.schmizz.sshj.common.Base64;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.plugins.textmate.configuration.TextMateUserBundlesSettings;
 import org.jetbrains.plugins.textmate.TextMateService;
@@ -21,7 +20,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.nio.file.Paths;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.concurrent.LinkedBlockingDeque;
 
 public class SlangLanguageServerFactory implements LanguageServerFactory
@@ -98,8 +96,8 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
             NotificationType.ERROR
         ).notify(project);
     }
-    // This function assumes if a file is lacking an extension, it is a directory
-    void extractZip(InputStream zipToUnpack, Path dstDir, Project project)
+
+    private void extractZip(File zipFile, Path dstDir, Project project)
     {
         File dir = dstDir.toFile();
         // create output directory if it doesn't exist
@@ -108,77 +106,117 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
             if(!dir.mkdirs())
                 failedToMakeFolder(project);
         }
-        //buffer for read and write data to file
-        byte[] buffer = new byte[1024];
-        try
+
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFile))
         {
-            ZipInputStream zis = new ZipInputStream(zipToUnpack);
-            ZipEntry ze = zis.getNextEntry();
-            while(ze != null)
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements())
             {
-                String fileName = ze.getName().replace("\\", "/");
+                ZipEntry entry = entries.nextElement();
+                String fileName = entry.getName();
                 Path newFilePath = dstDir.resolve(fileName);
                 File newFile = newFilePath.toFile();
-                if(!fileName.contains("."))
+
+                if (entry.isDirectory())
                 {
-                    if(!newFile.mkdirs())
+                    // Create directory
+                    if (!newFile.mkdirs() && !newFile.exists())
                         failedToMakeFolder(project);
                 }
                 else
                 {
-                    FileOutputStream fos = new FileOutputStream(newFile);
-                    int len;
-                    while ((len = zis.read(buffer)) > 0)
+                    // Ensure parent directories exist
+                    File parentDir = newFile.getParentFile();
+                    if (parentDir != null && !parentDir.exists())
                     {
-                        fos.write(buffer, 0, len);
+                        if (!parentDir.mkdirs())
+                            failedToMakeFolder(project);
                     }
-                    fos.close();
-                }
 
-                zis.closeEntry();
-                ze = zis.getNextEntry();
+                    // Extract file
+                    try (InputStream entryStream = zip.getInputStream(entry);
+                         FileOutputStream fos = new FileOutputStream(newFile))
+                    {
+                        copyToFile(entryStream, fos);
+                    }
+                }
             }
-            //close last ZipEntry
-            zis.closeEntry();
-            zis.close();
-            zipToUnpack.close();
         }
         catch (IOException e)
         {
             NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                "Slang LSP",
-                "Invalid slang-vscode-extension zip file(s)",
-                NotificationType.ERROR
+                    "Slang LSP",
+                    "Invalid slang-vscode-extension zip file(s)",
+                    NotificationType.ERROR
             ).notify(project);
             e.printStackTrace();
         }
     }
 
+
     void extractSlangVSCodeExtension(Project project)
     {
-        InputStream zipToUnpack;
+        boolean requiresExtraction = checkIfVSCodeExtensionRequiresExtraction(project);
+        if(!requiresExtraction)
+            return;
+
+        updateExtensionVersionCache(project);
+
+        // Create temporary file for the zip resource
+        File tempZipFile = null;
         try
         {
-            zipToUnpack = getClass().getClassLoader().getResourceAsStream("slang-vscode-extension.zip");
+            tempZipFile = File.createTempFile("slang_vscode_extension", ".zip");
+            tempZipFile.deleteOnExit();
+
+            // Copy resource to temporary file
+            try (InputStream resourceStream = getClass().getClassLoader().getResourceAsStream("slang-vscode-extension.zip"))
+            {
+                if (resourceStream == null)
+                {
+                    NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
+                            "Slang LSP",
+                            "Missing slang-vscode-extension.zip resource, build.gradle.kts task is not working",
+                            NotificationType.ERROR
+                    ).notify(project);
+                    return;
+                }
+
+                try (FileOutputStream tempOut = new FileOutputStream(tempZipFile))
+                {
+                    copyToFile(resourceStream, tempOut);
+                }
+            }
+
+            extractZip(tempZipFile, slanglsp.SlangUtils.getPluginDir(), project);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                "Slang LSP",
-                "Missing slang-vscode-extension.zip resource, build.gradle.kts task is not working",
-                NotificationType.ERROR
+                    "Slang LSP",
+                    "Missing slang-vscode-extension.zip resource, build.gradle.kts task is not working",
+                    NotificationType.ERROR
             ).notify(project);
-            return;
         }
-
-        boolean requiresExtraction = checkIfVSCodeExtensionRequiresExtraction(project);
-        if(requiresExtraction)
+        finally
         {
-            updateExtensionVersionCache(project);
-
-            extractZip(zipToUnpack, slanglsp.SlangUtils.getPluginDir(), project);
+            // Clean up temporary file
+            if (tempZipFile != null && tempZipFile.exists())
+            {
+                boolean success = tempZipFile.delete();
+            }
         }
     }
+
+    private static void copyToFile(InputStream inputStream, FileOutputStream outputStream) throws IOException {
+        var buffer = new byte[8192];
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1)
+        {
+            outputStream.write(buffer, 0, bytesRead);
+        }
+    }
+
 
     void tryRunInitLogic(Project project)
     {
@@ -253,25 +291,31 @@ class SlangLanguageServer extends ProcessStreamConnectionProvider
 
     private Optional<String> findExecutableUsingExplicitSlangdLocation()
     {
-        var dirFiles = Paths.get(SlangPersistentStateConfig.getInstance(project).getExplicitSlangdLocation()).toFile().listFiles(new FindLspExeFilter());
+        var state = SlangPersistentStateConfig.getInstance(project);
+        if (state != null && !state.getExplicitSlangdLocation().isEmpty())
+        {
+            var dirFiles = Paths.get(state.getExplicitSlangdLocation()).toFile().listFiles(new FindLspExeFilter());
+            if(dirFiles == null)
+                return Optional.empty();
+            for(var i : dirFiles)
+                return Optional.of(i.getAbsolutePath());
+        }
 
-        if(dirFiles == null)
-            return Optional.empty();
-        for(var i : dirFiles)
-            return Optional.of(i.getAbsolutePath());
         return Optional.empty();
     }
 
     private Optional<String> findExecutableInPATH()
     {
-        String[] paths = EnvironmentUtil.getValue("PATH").split(File.pathSeparator);
-        for(var pathString : paths)
-        {
-            var dirFiles = Paths.get(pathString).toFile().listFiles(new FindLspExeFilter());
-            if(dirFiles == null)
-                continue;
-            for(var i : dirFiles)
-                return Optional.of(i.getAbsolutePath());
+        var path = EnvironmentUtil.getValue("PATH");
+        if (path != null && !path.isEmpty()) {
+            String[] paths = path.split(File.pathSeparator);
+            for (var pathString : paths) {
+                var dirFiles = Paths.get(pathString).toFile().listFiles(new FindLspExeFilter());
+                if (dirFiles == null)
+                    continue;
+                for (var i : dirFiles)
+                    return Optional.of(i.getAbsolutePath());
+            }
         }
         return Optional.empty();
     }

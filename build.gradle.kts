@@ -48,16 +48,17 @@ fun createZipFileOfVSCodeExtension()
     val outputZipFile: File = Paths.get(getResourcesFolder()+"slang-vscode-extension.zip").toFile()
     val inputDirectory: File = Paths.get(project.projectDir.toString()+"/slang-vscode-extension/").absolute().toFile()
 
-    val hiddenRelativeDir: String = inputDirectory.toRelativeString(project.projectDir)+"\\.";
-    val docRelativeDir: String = inputDirectory.toRelativeString(project.projectDir)+"\\doc";
-    // println("relativeDir: "+hiddenRelativeDir)
+    val inputPath = inputDirectory.toPath()
+    val projectPath = project.projectDir.toPath()
+    
+    val hiddenRelativeDir = projectPath.relativize(inputPath).resolve(".").toString()
+    val docRelativeDir = projectPath.relativize(inputPath).resolve("doc").toString()
+    
     ZipOutputStream(BufferedOutputStream(FileOutputStream(outputZipFile))).use { zipFile ->
         inputDirectory.walkTopDown().forEach { file ->
             val zipFileName = file.toRelativeString(project.projectDir)
-            if(!zipFileName.toString().startsWith(hiddenRelativeDir)
-                && !zipFileName.toString().startsWith(docRelativeDir)) {
-                val entry = ZipEntry("$zipFileName${(if (file.isDirectory) "\\" else "")}")
-                // println("entry: " + entry)
+            if(!zipFileName.startsWith(hiddenRelativeDir) && !zipFileName.startsWith(docRelativeDir)) {
+                val entry = ZipEntry("$zipFileName${(if (file.isDirectory) "/" else "")}")
                 zipFile.putNextEntry(entry)
                 if (file.isFile) {
                     file.inputStream().use { fis -> fis.copyTo(zipFile) }
