@@ -113,7 +113,7 @@ public class SlangLanguageServerFactory implements LanguageServerFactory
             while (entries.hasMoreElements())
             {
                 ZipEntry entry = entries.nextElement();
-                String fileName = entry.getName();
+                String fileName = entry.getName().replace("\\", "/");
                 Path newFilePath = dstDir.resolve(fileName);
                 File newFile = newFilePath.toFile();
 
