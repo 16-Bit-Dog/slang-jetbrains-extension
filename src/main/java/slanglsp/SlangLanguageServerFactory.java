@@ -19,227 +19,19 @@ import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
 import java.nio.file.Paths;
-import java.util.zip.ZipEntry;
 import java.util.concurrent.LinkedBlockingDeque;
 
 public class SlangLanguageServerFactory implements LanguageServerFactory
 {
-    Path getSlangTextMateBundlePath()
-    {
-        return slanglsp.SlangUtils.getPluginDir().resolve("slang-vscode-extension");
-    }
-
-    static boolean IS_FIRST_INIT = true;
-
-    void loadTextMate(Project project)
-    {
-        try
-        {
-            TextMateUserBundlesSettings.getInstance().addBundle(getSlangTextMateBundlePath().toAbsolutePath().toString(), "slang-vscode-extension");
-        } catch (Exception e)
-        {
-            NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                "Slang LSP",
-                "The Slang-TextMate-json file is not embedded into the lsp plugin",
-                NotificationType.ERROR
-            ).notify(project);
-        }
-        TextMateService.getInstance().reloadEnabledBundles();
-    }
-
-    void updateExtensionVersionCache(Project project)
-    {
-        // set value of extension version cache
-        File versionCacheFile = SlangUtils.getVersionCacheFile();
-        try
-        {
-            SlangVersion cachedVersion = SlangUtils.getVersion();
-            SlangVersion.writeSlangVersionFile(versionCacheFile, cachedVersion.getMajor(), cachedVersion.getMinor(), cachedVersion.getPatch());
-        } catch (Exception e)
-        {
-            NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                "Slang LSP",
-                "failed to create to versionCache.txt. Requires ability to create+read+write files",
-                NotificationType.ERROR
-            ).notify(project);
-        }
-    }
-
-    boolean checkIfVSCodeExtensionRequiresExtraction(Project project)
-    {
-        // If cache is missing, return true
-        File versionCacheFile = SlangUtils.getVersionCacheFile();
-
-        if (!versionCacheFile.exists())
-            return true;
-
-        // If cache version != current version, return true
-        try
-        {
-            SlangVersion cachedVersion = new SlangVersion(versionCacheFile.toURI().toURL().openStream());
-            if (!cachedVersion.equals(SlangUtils.getVersion()))
-                return true;
-        } catch (Exception e)
-        {
-            updateExtensionVersionCache(project);
-            return true;
-        }
-
-        return false;
-    }
-
-    void failedToMakeFolder(Project project)
-    {
-        NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-            "Slang LSP",
-            "Failed to create folder",
-            NotificationType.ERROR
-        ).notify(project);
-    }
-
-    private void extractZip(File zipFile, Path dstDir, Project project)
-    {
-        File dir = dstDir.toFile();
-        // create output directory if it doesn't exist
-        if(!dir.exists())
-        {
-            if(!dir.mkdirs())
-                failedToMakeFolder(project);
-        }
-
-        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFile))
-        {
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements())
-            {
-                ZipEntry entry = entries.nextElement();
-                String fileName = entry.getName().replace("\\", "/");
-                Path newFilePath = dstDir.resolve(fileName);
-                File newFile = newFilePath.toFile();
-
-                if (entry.isDirectory())
-                {
-                    // Create directory
-                    if (!newFile.mkdirs() && !newFile.exists())
-                        failedToMakeFolder(project);
-                }
-                else
-                {
-                    // Ensure parent directories exist
-                    File parentDir = newFile.getParentFile();
-                    if (parentDir != null && !parentDir.exists())
-                    {
-                        if (!parentDir.mkdirs())
-                            failedToMakeFolder(project);
-                    }
-
-                    // Extract file
-                    try (InputStream entryStream = zip.getInputStream(entry);
-                         FileOutputStream fos = new FileOutputStream(newFile))
-                    {
-                        copyToFile(entryStream, fos);
-                    }
-                }
-            }
-        }
-        catch (IOException e)
-        {
-            NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                    "Slang LSP",
-                    "Invalid slang-vscode-extension zip file(s)",
-                    NotificationType.ERROR
-            ).notify(project);
-            e.printStackTrace();
-        }
-    }
-
-
-    void extractSlangVSCodeExtension(Project project)
-    {
-        boolean requiresExtraction = checkIfVSCodeExtensionRequiresExtraction(project);
-        if(!requiresExtraction)
-            return;
-
-        updateExtensionVersionCache(project);
-
-        // Create temporary file for the zip resource
-        File tempZipFile = null;
-        try
-        {
-            tempZipFile = File.createTempFile("slang_vscode_extension", ".zip");
-            tempZipFile.deleteOnExit();
-
-            // Copy resource to temporary file
-            try (InputStream resourceStream = getClass().getClassLoader().getResourceAsStream("slang-vscode-extension.zip"))
-            {
-                if (resourceStream == null)
-                {
-                    NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                            "Slang LSP",
-                            "Missing slang-vscode-extension.zip resource, build.gradle.kts task is not working",
-                            NotificationType.ERROR
-                    ).notify(project);
-                    return;
-                }
-
-                try (FileOutputStream tempOut = new FileOutputStream(tempZipFile))
-                {
-                    copyToFile(resourceStream, tempOut);
-                }
-            }
-
-            extractZip(tempZipFile, slanglsp.SlangUtils.getPluginDir(), project);
-        }
-        catch (Exception e)
-        {
-            NotificationGroupManager.getInstance().getNotificationGroup("Slang LSP").createNotification(
-                    "Slang LSP",
-                    "Missing slang-vscode-extension.zip resource, build.gradle.kts task is not working",
-                    NotificationType.ERROR
-            ).notify(project);
-        }
-        finally
-        {
-            // Clean up temporary file
-            if (tempZipFile != null && tempZipFile.exists())
-            {
-                boolean success = tempZipFile.delete();
-            }
-        }
-    }
-
-    private static void copyToFile(InputStream inputStream, FileOutputStream outputStream) throws IOException {
-        var buffer = new byte[8192];
-        int bytesRead;
-        while ((bytesRead = inputStream.read(buffer)) != -1)
-        {
-            outputStream.write(buffer, 0, bytesRead);
-        }
-    }
-
-
-    void tryRunInitLogic(Project project)
-    {
-        if(IS_FIRST_INIT)
-        {
-            IS_FIRST_INIT = false;
-            extractSlangVSCodeExtension(project);
-            loadTextMate(project);
-        }
-    }
-
-
     @NotNull
     public StreamConnectionProvider createConnectionProvider(Project project)
     {
-        tryRunInitLogic(project);
         return new SlangLanguageServer(project);
     }
 
     @NotNull
     public LanguageClientImpl createLanguageClient(Project project)
     {
-        tryRunInitLogic(project);
         return new SlangLanguageClient(project);
     }
 };
@@ -333,6 +125,60 @@ class SlangLanguageClient extends LanguageClientImpl
         maybeAliveClients.add(this);
     }
 
+    @Override
+    public void handleServerStatusChanged(com.redhat.devtools.lsp4ij.ServerStatus serverStatus)
+    {
+        if (serverStatus == com.redhat.devtools.lsp4ij.ServerStatus.started)
+        {
+            // Re-enable Semantic Tokens and deeply map them to JetBrains IDE colors
+            getClientFeatures().setSemanticTokensFeature(new com.redhat.devtools.lsp4ij.client.features.LSPSemanticTokensFeature() {
+                @Override
+                public com.intellij.openapi.editor.colors.TextAttributesKey getTextAttributesKey(String type, java.util.List<String> modifiers, com.intellij.psi.PsiFile file) {
+                    if (type == null) return super.getTextAttributesKey(type, modifiers, file);
+                    
+                    switch (type) {
+                        case "type":
+                        case "class":
+                        case "struct":
+                        case "interface":
+                        case "enum":
+                        case "typeParameter":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.TYPE_NAME;
+                        case "parameter":
+                        case "variable":
+                        case "property":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.VARIABLE;
+                        case "enumMember":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.CONSTANT;
+                        case "function":
+                        case "method":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.FUNCTION_CALL;
+                        case "macro":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.MACRO_KEYWORD;
+                        case "keyword":
+                        case "modifier":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.KEYWORD;
+                        case "comment":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.LINE_COMMENT;
+                        case "string":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.STRING;
+                        case "number":
+                            return slanglsp.highlighting.SlangSyntaxHighlighterColors.NUMBER;
+                        case "operator":
+                            return com.intellij.openapi.editor.DefaultLanguageHighlighterColors.OPERATION_SIGN; // Keep default for operator
+                    }
+                    
+                    return super.getTextAttributesKey(type, modifiers, file);
+                }
+            });
+            triggerChangeConfiguration();
+        }
+        if(serverStatus == com.redhat.devtools.lsp4ij.ServerStatus.stopped)
+        {
+            maybeAliveClients.remove(this);
+        }
+    }
+
     public Object createSettings()
     {
         var state = SlangPersistentStateConfig.getInstance(project).getState();
@@ -344,15 +190,5 @@ class SlangLanguageClient extends LanguageClientImpl
         super.triggerChangeConfiguration();
     }
 
-    public void handleServerStatusChanged(ServerStatus serverStatus)
-    {
-        if (serverStatus == ServerStatus.started)
-        {
-            triggerChangeConfiguration();
-        }
-        if(serverStatus == ServerStatus.stopped)
-        {
-            maybeAliveClients.remove(this);
-        }
-    }
+
 }

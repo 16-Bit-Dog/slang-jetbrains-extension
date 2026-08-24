@@ -23,5 +23,20 @@ https://plugins.jetbrains.com/plugin/26239-slang-unofficial-
 ### If highlighting does not work, try the following:
 (1) delete the Slang extension
 (2) remove the `slang-vscode-extension` textmate bundle from jetbrains settings
-(3) reinstall the Slang extension (latest version
+(3) reinstall the Slang extension (latest version)
+
+---
+
+### To Run Tests
+The project contains native Java tests to verify Lexer and Syntax Highlighter correctness. To run the tests, use the included Gradle wrapper (requires JDK 21):
+
+**On Windows:**
+```cmd
+./gradlew test
+```
+
+**On macOS/Linux:**
+```bash
+./gradlew test
+```
 

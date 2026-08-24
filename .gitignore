@@ -54,3 +54,8 @@ src/main/resources/version.txt
 
 TODO.txt
 *.log
+
+# Local files
+gradle.zip
+gradle-8.5/
+local.properties

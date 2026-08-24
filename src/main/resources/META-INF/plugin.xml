@@ -17,13 +17,12 @@
     </change-notes>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.redhat.devtools.lsp4ij</depends>
+    <depends>org.jetbrains.plugins.textmate</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <fileType name="Slang" language="Slang" implementationClass="slanglsp.SlangFileType" extensions="slang" fieldName="INSTANCE"/>
-
-        <editorHighlighterProvider filetype="Slang" implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
-        <lang.syntaxHighlighterFactory language="Slang"
-                                   implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
+        <fileType name="Slang" implementationClass="slanglsp.SlangFileType" fieldName="INSTANCE" language="Slang" extensions="slang;slangh"/>
+        
+        <lang.syntaxHighlighterFactory language="Slang" implementationClass="slanglsp.SlangSyntaxHighlighterFactory"/>
 
         <codeInsight.parameterInfo
                 language="Slang"

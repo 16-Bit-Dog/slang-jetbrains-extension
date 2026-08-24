@@ -26,7 +26,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2023.3.6")
+        intellijIdeaCommunity("2024.1.4")
         pluginVerifier()
         zipSigner()
         instrumentationTools()
@@ -36,6 +36,7 @@ dependencies {
         plugin("com.redhat.devtools.lsp4ij:0.13.0")
     }
     implementation("com.google.code.gson:gson:2.11.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
 }
 
 fun getResourcesFolder(): String
@@ -99,6 +100,10 @@ tasks {
 
     buildPlugin
 
+    test {
+        useJUnitPlatform()
+    }
+
     runIde
     /*
     signPlugin {
@@ -116,14 +121,14 @@ tasks {
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "233.0"
+            sinceBuild = "241.0"
             untilBuild = provider { null }
         }
     }
     pluginVerification {
         ides {
-            ide(IntelliJPlatformType.IntellijIdeaCommunity, "2023.3.6")
-            ide(IntelliJPlatformType.CLion, "2023.3.6")
+            ide(IntelliJPlatformType.IntellijIdeaCommunity, "2024.1.4")
+            ide(IntelliJPlatformType.CLion, "2024.1.4")
         }
     }
 }
