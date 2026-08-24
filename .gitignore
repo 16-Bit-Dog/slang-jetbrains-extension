@@ -49,7 +49,6 @@ gradle
 gradlew
 gradlew.bat
 
-src/main/resources/slang-vscode-extension.zip
 src/main/resources/version.txt
 
 TODO.txt

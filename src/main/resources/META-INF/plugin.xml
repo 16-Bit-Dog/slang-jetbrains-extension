@@ -15,9 +15,9 @@
     <change-notes><![CDATA[
     ]]>
     </change-notes>
+    <!-- Product and plugin compatibility requirements. -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.redhat.devtools.lsp4ij</depends>
-    <depends>org.jetbrains.plugins.textmate</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="Slang" implementationClass="slanglsp.SlangFileType" fieldName="INSTANCE" language="Slang" extensions="slang;slangh"/>

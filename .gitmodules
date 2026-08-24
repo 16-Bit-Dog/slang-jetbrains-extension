@@ -1,4 +1,0 @@
-[submodule "slang-vscode-extension"]
-	path = slang-vscode-extension
-	url = https://github.com/16-Bit-Dog/slang-vscode-extension.git
-	branch = slang-textmate-grammer-for-jetbrains
