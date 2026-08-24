@@ -4,7 +4,7 @@ import java.nio.file.Paths
 import java.util.zip.*
 import kotlin.io.path.absolute
 
-fun getProjectVersion():String = "0.0.7"
+fun getProjectVersion():String = "0.0.8"
 project.version = getProjectVersion()
 group = "slang"
 
